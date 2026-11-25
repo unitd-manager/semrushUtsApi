@@ -1,0 +1,4 @@
+ALTER TABLE `Ranking`
+    MODIFY `device` VARCHAR(16) NOT NULL DEFAULT 'desktop',
+    MODIFY `location` VARCHAR(16) NOT NULL DEFAULT 'US',
+    MODIFY `provider` VARCHAR(16) NOT NULL;

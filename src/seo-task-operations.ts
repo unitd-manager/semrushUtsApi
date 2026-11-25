@@ -1,0 +1,35 @@
+export const seoTaskStatuses = ["BACKLOG", "TODO", "ASSIGNED", "IN_PROGRESS", "BLOCKED", "READY_FOR_REVIEW", "CHANGES_REQUESTED", "APPROVED", "COMPLETED", "VERIFICATION_PENDING", "VERIFIED", "REOPENED", "CANCELLED"] as const;
+export const seoTaskPriorities = ["P0", "P1", "P2", "P3"] as const;
+export const seoTaskCategories = ["TECHNICAL_SEO", "ON_PAGE_SEO", "OFF_PAGE_SEO", "KEYWORD_RESEARCH", "CONTENT_CREATION", "CONTENT_OPTIMIZATION", "INTERNAL_LINKING", "LINK_BUILDING", "LOCAL_SEO", "WEBSITE_PERFORMANCE", "INDEXING_CRAWLING", "SCHEMA_STRUCTURED_DATA", "COMPETITOR_ANALYSIS", "CONVERSION_OPTIMIZATION", "SEO_STRATEGY", "CUSTOM"] as const;
+
+const transitions: Record<string, readonly string[]> = {
+  BACKLOG: ["TODO", "CANCELLED"], TODO: ["ASSIGNED", "BACKLOG", "CANCELLED"],
+  ASSIGNED: ["IN_PROGRESS", "BLOCKED", "TODO", "CANCELLED"], IN_PROGRESS: ["BLOCKED", "READY_FOR_REVIEW", "CANCELLED"],
+  BLOCKED: ["TODO", "ASSIGNED", "IN_PROGRESS", "CANCELLED"], READY_FOR_REVIEW: ["CHANGES_REQUESTED", "APPROVED", "IN_PROGRESS"],
+  CHANGES_REQUESTED: ["IN_PROGRESS", "CANCELLED"], APPROVED: ["COMPLETED", "VERIFICATION_PENDING", "IN_PROGRESS"],
+  COMPLETED: ["VERIFICATION_PENDING", "REOPENED"], VERIFICATION_PENDING: ["VERIFIED", "REOPENED"],
+  VERIFIED: ["REOPENED"], REOPENED: ["ASSIGNED", "IN_PROGRESS", "CANCELLED"], CANCELLED: ["BACKLOG"],
+};
+
+export function canTransitionTask(from: string, to: string): boolean { return transitions[from]?.includes(to) ?? false; }
+
+export function recommendSeoTaskPriority(input: { severity?: string | null; affectedUrlCount?: number; category?: string | null }): "P0" | "P1" | "P2" | "P3" {
+  const severity = (input.severity ?? "").toUpperCase(); const count = Math.max(0, input.affectedUrlCount ?? 0);
+  if (severity === "CRITICAL" && count >= 25) return "P0";
+  if (severity === "CRITICAL" || (count >= 100 && ["CANONICAL", "INDEXING", "REDIRECT", "BROKEN_LINK"].some((value) => (input.category ?? "").toUpperCase().includes(value)))) return "P1";
+  if (severity === "ERROR" || count >= 10) return "P2";
+  return "P3";
+}
+
+export function dependencyWouldCycle(taskId: string, dependsOnTaskId: string, edges: { taskId: string; dependsOnTaskId: string }[]): boolean {
+  if (taskId === dependsOnTaskId) return true;
+  const adjacency = new Map<string, string[]>();
+  for (const edge of edges) adjacency.set(edge.taskId, [...(adjacency.get(edge.taskId) ?? []), edge.dependsOnTaskId]);
+  const visited = new Set<string>(); const stack = [dependsOnTaskId];
+  while (stack.length) { const current = stack.pop()!; if (current === taskId) return true; if (visited.has(current)) continue; visited.add(current); stack.push(...(adjacency.get(current) ?? [])); }
+  return false;
+}
+
+export function isTaskOverdue(task: { dueDate: Date | null; status: string }, now = new Date()): boolean {
+  return Boolean(task.dueDate && task.dueDate.getTime() < now.getTime() && !["COMPLETED", "VERIFIED", "CANCELLED"].includes(task.status));
+}

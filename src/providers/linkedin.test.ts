@@ -1,0 +1,10 @@
+import { describe, expect, it, vi } from "vitest";
+import { linkedInAuthorizationUrl, linkedInSocialActions, publishLinkedInText } from "./linkedin.js";
+import type { IntegrationTokens } from "../integration-security.js";
+const config = { clientId: "client", clientSecret: "secret", redirectUri: "https://app.example.com/api/v1/social/linkedin/callback", version: "202609" };
+const token: IntegrationTokens = { accessToken: "secret", refreshToken: null, expiresAt: Date.now() + 1_000_000, scope: "openid profile w_member_social", tokenType: "Bearer" };
+describe("LinkedIn connector", () => {
+  it("requests only profile and member posting scopes", () => { const url = new URL(linkedInAuthorizationUrl(config, "signed-state")); expect(url.searchParams.get("scope")).toBe("openid profile w_member_social"); expect(url.searchParams.get("state")).toBe("signed-state"); });
+  it("publishes a member text post and captures its canonical ID", async () => { const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ id: "urn:li:ugcPost:123" }), { status: 201, headers: { "x-restli-id": "urn:li:ugcPost:123" } })); const result = await publishLinkedInText(token, "urn:li:person:42", "Hello", request); expect(result.id).toBe("urn:li:ugcPost:123"); expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toMatchObject({ lifecycleState: "PUBLISHED", author: "urn:li:person:42" }); });
+  it("maps actual likes/comments and rejects malformed post IDs", async () => { const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ likesSummary: { totalLikes: 3 }, commentsSummary: { totalFirstLevelComments: 2 } }), { status: 200 })); await expect(linkedInSocialActions(token, "urn:li:ugcPost:123", request)).resolves.toMatchObject({ likes: 3, comments: 2 }); await expect(linkedInSocialActions(token, "https://invalid", request)).rejects.toMatchObject({ code: "invalid_post_id" }); });
+});

@@ -1,0 +1,3 @@
+ALTER TABLE `CrawlPage`
+  ADD COLUMN `h1Count` INTEGER NULL,
+  ADD COLUMN `contentDigest` VARCHAR(191) NULL;

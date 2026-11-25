@@ -1,0 +1,1784 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MANAGER
+  ANALYST
+  VIEWER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum Severity {
+  CRITICAL
+  ERROR
+  WARNING
+  NOTICE
+}
+
+enum BacklinkReviewState {
+  NEEDS_REVIEW
+  KEEP
+  REMOVAL_REQUESTED
+  DISAVOW_APPROVED
+}
+
+enum DataConfidence {
+  FIRST_PARTY
+  PROVIDER_OBSERVED
+  PROVIDER_ESTIMATE
+  USER_ENTERED
+  SAMPLE
+  UNAVAILABLE
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum LeadStage {
+  NEW
+  QUALIFIED
+  CONTACTED
+  MEETING
+  PROPOSAL
+  WON
+  LOST
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+model User {
+  id            String               @id @default(cuid())
+  email         String               @unique
+  name          String
+  passwordHash  String
+  createdAt     DateTime             @default(now())
+  memberships   OrganizationMember[]
+  createdTasks  Task[]               @relation("TaskCreator")
+  assignedTasks Task[]               @relation("TaskAssignee")
+  auditEvents   ActivityLog[]
+  backlinkReviews BacklinkReview[]
+  createdAgentTasks AgentTask[] @relation("AgentTaskCreator")
+  reviewedAgentApprovals AgentApproval[] @relation("AgentApprovalReviewer")
+}
+
+model Organization {
+  id              String               @id @default(cuid())
+  name            String
+  slug            String               @unique
+  createdAt       DateTime             @default(now())
+  members         OrganizationMember[]
+  projects        Project[]
+  domains         Domain[]
+  subscription    Subscription?
+  tasks           Task[]
+  keywords        Keyword[]
+  keywordLists    KeywordList[]
+  reports         Report[]
+  integrations    Integration[]
+  notifications   Notification[]
+  workflows       Workflow[]
+  leads           Lead[]
+  campaigns       Campaign[]
+  contentPieces   ContentPiece[]
+  apiUsage        ApiUsage[]
+  activity        ActivityLog[]
+  recommendations Recommendation[]
+  localListings   LocalListing[]
+  reviews         Review[]
+  aiPrompts       AiPrompt[]
+  socialAccounts  SocialAccount[]
+  aiAgentTasks    AgentTask[]
+  aiAgentApprovals AgentApproval[]
+  aiAgentSettings AgentSetting[]
+  dailySeoBriefingSettings DailySeoBriefingSetting[]
+  dailySeoBriefings DailySeoBriefing[]
+  seoFixSettings SeoFixCenterSetting[]
+  seoFixes SeoFix[]
+  seoFixProposals SeoFixProposal[]
+  seoFixApprovals SeoFixApproval[]
+  seoFixExecutions SeoFixExecution[]
+  seoFixSnapshots SeoFixSnapshot[]
+  seoFixVerifications SeoFixVerification[]
+  seoFixRollbacks SeoFixRollback[]
+  seoFixAuditLogs SeoFixAuditLog[]
+  reportingClients ClientReportClient[]
+  reportBranding ClientReportBranding?
+  reportTemplates ClientReportTemplate[]
+  clientReports ClientReport[]
+  clientReportSchedules ClientReportSchedule[]
+  reportDeliveries ClientReportDelivery[]
+  reportAccessLogs ClientReportAccessLog[]
+  seoOpsProjects SeoOpsProject[]
+  seoTasks SeoTask[]
+  seoTaskAutomationRules SeoTaskAutomationRule[]
+  seoTaskAutomationLogs SeoTaskAutomationLog[]
+  seoIntelligenceRecords SeoIntelligenceRecord[]
+  keywordPageMappings KeywordPageMapping[]
+  contentVersions ContentVersion[]
+  contentReviews ContentReview[]
+  competitorMonitors CompetitorMonitor[]
+  seoSchedules SeoSchedule[]
+  backgroundJobs BackgroundJob[]
+  seoScheduleExecutions SeoScheduleExecution[]
+}
+
+model OrganizationMember {
+  organizationId String
+  userId         String
+  role           MemberRole   @default(ANALYST)
+  joinedAt       DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
+  @@index([userId, role])
+}
+
+model Subscription {
+  id                     String             @id @default(cuid())
+  organizationId         String             @unique
+  plan                   String             @default("trial")
+  status                 SubscriptionStatus @default(TRIAL)
+  trialEndsAt            DateTime?
+  currentPeriodEnd       DateTime?
+  providerCustomerId     String?
+  providerSubscriptionId String?
+  createdAt              DateTime           @default(now())
+  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoices               Invoice[]
+}
+
+model Invoice {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  amountCents    Int
+  currency       String       @default("USD")
+  status         String
+  externalId     String?      @unique
+  issuedAt       DateTime     @default(now())
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id              String           @id @default(cuid())
+  organizationId  String
+  name            String
+  status          ProjectStatus    @default(ACTIVE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  domains         Domain[]
+  tasks           Task[]
+  reports         Report[]
+  recommendations Recommendation[]
+  aiAgentTasks    AgentTask[]
+  aiAgentApprovals AgentApproval[]
+  dailySeoBriefingSettings DailySeoBriefingSetting[]
+  dailySeoBriefings DailySeoBriefing[]
+  seoFixSettings SeoFixCenterSetting[]
+  seoFixes SeoFix[]
+  clientReportingWebsites ClientReportWebsite[]
+  clientReportScheduleWebsites ClientReportScheduleWebsite[]
+  reportWebsites ClientReportIncludedWebsite[]
+  seoOpsProjects SeoOpsProject[]
+  seoIntelligenceRecords SeoIntelligenceRecord[]
+  keywordPageMappings KeywordPageMapping[]
+  competitorMonitors CompetitorMonitor[]
+  seoSchedules SeoSchedule[]
+
+  @@index([organizationId, status, updatedAt])
+}
+
+model DailySeoBriefingSetting {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String
+  enabled        Boolean      @default(false)
+  hourUtc        Int          @default(8)
+  minuteUtc      Int          @default(0)
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, projectId])
+  @@index([enabled, nextRunAt])
+}
+
+model DailySeoBriefing {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String
+  briefDate      DateTime     @db.Date
+  generatedAt    DateTime     @default(now())
+  data           Json
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, projectId, briefDate])
+  @@index([organizationId, generatedAt(sort: Desc)])
+}
+
+model SeoFixCenterSetting {
+  id                  String       @id @default(cuid())
+  organizationId      String
+  projectId           String
+  titleMinLength      Int          @default(30)
+  titleMaxLength      Int          @default(60)
+  descriptionMinLength Int         @default(120)
+  descriptionMaxLength Int         @default(160)
+  approvalRequired    Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project             Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, projectId])
+}
+
+model SeoFix {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String
+  websiteId      String
+  auditIssueId   String
+  subresourceKey String       @default("")
+  pageUrl        String       @db.VarChar(512)
+  issueType      String
+  severity       Severity
+  status         String       @default("DETECTED")
+  detectedAt     DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  website        Domain       @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  auditIssue     AuditIssue   @relation(fields: [auditIssueId], references: [id], onDelete: Cascade)
+  proposals      SeoFixProposal[]
+  approvals      SeoFixApproval[]
+  executions     SeoFixExecution[]
+  snapshots      SeoFixSnapshot[]
+  verifications  SeoFixVerification[]
+  rollbacks      SeoFixRollback[]
+  auditLogs      SeoFixAuditLog[]
+
+  @@unique([auditIssueId, subresourceKey])
+  @@index([organizationId, projectId, status, detectedAt(sort: Desc)])
+  @@index([organizationId, issueType, severity])
+  @@index([websiteId, pageUrl])
+}
+
+model SeoFixProposal {
+  id              String       @id @default(cuid())
+  organizationId  String
+  fixId           String
+  version         Int
+  originalState   Json
+  proposedState   Json
+  explanation     String       @db.Text
+  expectedBenefit String       @db.Text
+  confidence      Float
+  riskLevel       String
+  evidence        Json
+  generatedAt     DateTime     @default(now())
+  createdById     String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fix             SeoFix       @relation(fields: [fixId], references: [id], onDelete: Cascade)
+  approval        SeoFixApproval?
+  executions      SeoFixExecution[]
+
+  @@unique([fixId, version])
+  @@index([organizationId, generatedAt(sort: Desc)])
+}
+
+model SeoFixApproval {
+  id             String       @id @default(cuid())
+  organizationId String
+  fixId          String
+  proposalId     String       @unique
+  status         String
+  approvedById   String
+  comments       String?      @db.Text
+  reviewedAt     DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fix            SeoFix       @relation(fields: [fixId], references: [id], onDelete: Cascade)
+  proposal       SeoFixProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, reviewedAt(sort: Desc)])
+}
+
+model SeoFixExecution {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  fixId              String
+  proposalId         String
+  idempotencyKey     String       @unique
+  adapterType        String
+  executionStatus    String
+  executedById       String
+  startedAt          DateTime     @default(now())
+  finishedAt         DateTime?
+  errorMessage       String?      @db.Text
+  verificationStatus String       @default("PENDING")
+  result             Json?
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fix                SeoFix       @relation(fields: [fixId], references: [id], onDelete: Cascade)
+  proposal           SeoFixProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  snapshot           SeoFixSnapshot?
+  verification       SeoFixVerification?
+  rollback           SeoFixRollback?
+
+  @@unique([fixId, proposalId])
+  @@index([organizationId, executionStatus, startedAt(sort: Desc)])
+}
+
+model SeoFixSnapshot {
+  id               String       @id @default(cuid())
+  organizationId   String
+  fixId            String
+  executionId      String       @unique
+  beforeState      Json
+  afterState       Json?
+  rollbackSupported Boolean     @default(false)
+  snapshotSource   String
+  createdAt        DateTime     @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fix              SeoFix       @relation(fields: [fixId], references: [id], onDelete: Cascade)
+  execution        SeoFixExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([fixId, createdAt(sort: Desc)])
+}
+
+model SeoFixVerification {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  fixId              String
+  executionId        String       @unique
+  verificationStatus String
+  observedState      Json?
+  details            String?      @db.Text
+  checkedAt          DateTime     @default(now())
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fix                SeoFix       @relation(fields: [fixId], references: [id], onDelete: Cascade)
+  execution          SeoFixExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, verificationStatus, checkedAt(sort: Desc)], map: "SeoFixVerification_org_status_checked_idx")
+}
+
+model SeoFixRollback {
+  id             String       @id @default(cuid())
+  organizationId String
+  fixId          String
+  executionId    String       @unique
+  status         String
+  initiatedById  String
+  initiatedAt    DateTime     @default(now())
+  finishedAt     DateTime?
+  result         Json?
+  errorMessage   String?      @db.Text
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fix            SeoFix       @relation(fields: [fixId], references: [id], onDelete: Cascade)
+  execution      SeoFixExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, initiatedAt(sort: Desc)])
+}
+
+model SeoFixAuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  fixId          String
+  userId         String?
+  action         String
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fix            SeoFix       @relation(fields: [fixId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([fixId, createdAt(sort: Desc)])
+}
+
+model Domain {
+  id               String            @id @default(cuid())
+  organizationId   String
+  projectId        String?
+  host             String
+  label            String?
+  isPrimary        Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project          Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  competitors      Competitor[]
+  crawls           Crawl[]
+  rankings         Ranking[]
+  backlinks        Backlink[]
+  backlinkSnapshots BacklinkSnapshot[]
+  keywordPositions KeywordPosition[]
+  seoFixes         SeoFix[]
+  clientReportingWebsites ClientReportWebsite[]
+  reportWebsites ClientReportIncludedWebsite[]
+  reportScheduleWebsites ClientReportScheduleWebsite[]
+  seoOpsProjects SeoOpsProject[]
+  seoIntelligenceRecords SeoIntelligenceRecord[]
+  keywordPageMappings KeywordPageMapping[]
+  competitorMonitors CompetitorMonitor[]
+  seoSchedules SeoSchedule[]
+
+  @@unique([organizationId, host])
+  @@index([projectId])
+}
+
+model Competitor {
+  id        String   @id @default(cuid())
+  domainId  String
+  host      String
+  label     String?
+  createdAt DateTime @default(now())
+  domain    Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  snapshots CompetitorSnapshot[]
+  monitors CompetitorMonitor[]
+  pageSnapshots CompetitorPageSnapshot[]
+  changeEvents CompetitorChangeEvent[]
+
+  @@unique([domainId, host])
+}
+
+model CompetitorSnapshot {
+  id          String       @id @default(cuid())
+  competitorId String
+  observedAt  DateTime     @default(now())
+  kind        String
+  location    String
+  provider    String
+  confidence  DataConfidence
+  totalCount  Int?
+  metrics     Json
+  keywords    Json
+  competitor  Competitor   @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  @@index([competitorId, kind, observedAt(sort: Desc)])
+}
+
+model Keyword {
+  id             String             @id @default(cuid())
+  organizationId String
+  phrase         String
+  locale         String             @default("en-US")
+  searchEngine   String             @default("google")
+  createdAt      DateTime           @default(now())
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metrics        KeywordMetric[]
+  positions      KeywordPosition[]
+  lists          KeywordListEntry[]
+  serpResults    SerpResult[]
+  pageMappings   KeywordPageMapping[]
+
+  @@unique([organizationId, phrase, locale, searchEngine])
+  @@index([organizationId, phrase])
+}
+
+model KeywordMetric {
+  id           String         @id @default(cuid())
+  keywordId    String
+  observedAt   DateTime       @default(now())
+  searchVolume Int?
+  difficulty   Float?
+  cpc          Float?
+  competition  Float?
+  intent       String?
+  trend        Json?
+  provider     String
+  confidence   DataConfidence
+  keyword      Keyword        @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@unique([keywordId, observedAt, provider])
+  @@index([keywordId, observedAt(sort: Desc)])
+}
+
+model KeywordPosition {
+  id         String         @id @default(cuid())
+  domainId   String
+  keywordId  String
+  observedAt DateTime       @default(now())
+  position   Int?
+  url        String?
+  device     String         @default("desktop")
+  provider   String
+  confidence DataConfidence
+  domain     Domain         @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  keyword    Keyword        @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@unique([domainId, keywordId, observedAt, device, provider])
+  @@index([domainId, observedAt(sort: Desc)])
+}
+
+model Ranking {
+  id         String         @id @default(cuid())
+  domainId   String
+  keyword    String
+  observedAt DateTime       @default(now())
+  position   Int?
+  url        String?
+  device     String         @default("desktop") @db.VarChar(16)
+  location   String         @default("US") @db.VarChar(16)
+  provider   String         @db.VarChar(16)
+  confidence DataConfidence
+  domain     Domain         @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@unique([domainId, keyword, observedAt, device, location, provider])
+  @@index([domainId, observedAt(sort: Desc)])
+}
+
+model SerpResult {
+  id         String         @id @default(cuid())
+  keywordId  String
+  observedAt DateTime       @default(now())
+  rank       Int
+  title      String?
+  url        String
+  snippet    String?
+  features   Json
+  provider   String
+  confidence DataConfidence
+  keyword    Keyword        @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@index([keywordId, observedAt(sort: Desc), rank])
+}
+
+model KeywordList {
+  id             String             @id @default(cuid())
+  organizationId String
+  name           String
+  kind           String             @default("LIST")
+  createdAt      DateTime           @default(now())
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entries        KeywordListEntry[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, kind])
+}
+
+model KeywordListEntry {
+  listId    String
+  keywordId String
+  addedAt   DateTime    @default(now())
+  list      KeywordList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  keyword   Keyword     @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@id([listId, keywordId])
+}
+
+model Backlink {
+  id         String         @id @default(cuid())
+  domainId   String
+  sourceUrl  String
+  targetUrl  String
+  anchorText String?
+  follow     Boolean?
+  firstSeen  DateTime?
+  lastSeen   DateTime?
+  lostAt     DateTime?
+  authority  Float?
+  toxicity   Float?
+  provider   String
+  confidence DataConfidence
+  domain     Domain         @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  review     BacklinkReview?
+
+  @@unique([domainId, sourceUrl, targetUrl])
+  @@index([domainId, lastSeen(sort: Desc)])
+}
+
+model BacklinkReview {
+  id         String              @id @default(cuid())
+  backlinkId String              @unique
+  reviewerId String?
+  state      BacklinkReviewState @default(NEEDS_REVIEW)
+  note       String?
+  updatedAt  DateTime            @updatedAt
+  backlink   Backlink            @relation(fields: [backlinkId], references: [id], onDelete: Cascade)
+  reviewer   User?               @relation(fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([state, updatedAt(sort: Desc)])
+}
+
+model BacklinkSnapshot {
+  id                    String         @id @default(cuid())
+  domainId              String
+  observedAt            DateTime       @default(now())
+  targetRank            Int?
+  backlinks             Int?
+  referringDomains      Int?
+  referringMainDomains  Int?
+  referringIps          Int?
+  referringPages        Int?
+  brokenBacklinks       Int?
+  backlinkSpamScore     Int?
+  targetSpamScore       Int?
+  provider              String
+  confidence            DataConfidence
+  metrics               Json
+  domain                Domain         @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@unique([domainId, observedAt, provider])
+  @@index([domainId, observedAt(sort: Desc)])
+}
+
+model Crawl {
+  id            String       @id @default(cuid())
+  domainId      String
+  startedAt     DateTime     @default(now())
+  finishedAt    DateTime?
+  status        String       @default("queued")
+  pagesCrawled  Int          @default(0)
+  issueCounts   Json?
+  healthScore   Int?
+  configuration Json
+  domain        Domain       @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  pages         CrawlPage[]
+  issues        AuditIssue[]
+
+  @@index([domainId, startedAt(sort: Desc)])
+}
+
+model CrawlPage {
+  id          String      @id @default(cuid())
+  crawlId     String
+  url         String
+  statusCode  Int?
+  title       String?
+  titleLength Int?
+  description String?
+  h1          String?
+  canonical   String?
+  robots      String?
+  indexable   Boolean?
+  wordCount   Int?
+  loadMs      Int?
+  h1Count     Int?
+  contentDigest String?
+  crawledAt   DateTime    @default(now())
+  crawl       Crawl       @relation(fields: [crawlId], references: [id], onDelete: Cascade)
+  outgoing    CrawlLink[] @relation("LinkSource")
+  incoming    CrawlLink[] @relation("LinkTarget")
+
+  @@unique([crawlId, url])
+  @@index([crawlId, statusCode])
+}
+
+model CrawlLink {
+  id         String     @id @default(cuid())
+  sourceId   String
+  targetId   String?
+  targetUrl  String
+  internal   Boolean
+  anchorText String?
+  source     CrawlPage  @relation("LinkSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target     CrawlPage? @relation("LinkTarget", fields: [targetId], references: [id], onDelete: SetNull)
+
+  @@index([sourceId, internal])
+  @@index([targetId])
+}
+
+model AuditIssue {
+  id       String   @id @default(cuid())
+  crawlId  String
+  pageUrl  String?
+  code     String
+  severity Severity
+  message  String
+  details  Json?
+  crawl    Crawl    @relation(fields: [crawlId], references: [id], onDelete: Cascade)
+  seoFixes SeoFix[]
+
+  @@index([crawlId, severity, code])
+}
+
+model Recommendation {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String?
+  module         String
+  title          String
+  description    String
+  evidence       Json?
+  state          String       @default("open")
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, state, createdAt(sort: Desc)])
+}
+
+model Task {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String?
+  title          String
+  description    String?
+  status         TaskStatus   @default(OPEN)
+  priority       TaskPriority @default(NORMAL)
+  dueAt          DateTime?
+  createdById    String
+  assigneeId     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdBy      User         @relation("TaskCreator", fields: [createdById], references: [id])
+  assignee       User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, dueAt])
+}
+
+model ContentPiece {
+  id             String       @id @default(cuid())
+  organizationId String
+  sourceId       String?
+  format         String       @default("article")
+  title          String
+  url            String?
+  body           String?      @db.Text
+  targetKeyword  String?
+  status         String       @default("draft")
+  score          Float?
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source         ContentPiece? @relation("ContentRepurposes", fields: [sourceId], references: [id], onDelete: SetNull)
+  variants       ContentPiece[] @relation("ContentRepurposes")
+  versions       ContentVersion[]
+  reviews        ContentReview[]
+
+  @@index([organizationId, status, updatedAt])
+  @@index([sourceId, updatedAt])
+}
+
+model LocalListing {
+  id             String       @id @default(cuid())
+  organizationId String
+  createdAt      DateTime     @default(now())
+  provider       String
+  externalId     String?
+  businessName   String
+  address        Json
+  phone          String?
+  url            String?
+  lastSyncedAt   DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reviews        Review[]
+
+  @@index([organizationId, provider])
+}
+
+model Review {
+  id             String        @id @default(cuid())
+  organizationId String
+  listingId      String?
+  provider       String
+  externalId     String
+  rating         Float?
+  text           String?
+  sentiment      String?
+  reviewedAt     DateTime?
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  listing        LocalListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, provider, externalId])
+  @@index([organizationId, reviewedAt(sort: Desc)])
+}
+
+model AiPrompt {
+  id             String       @id @default(cuid())
+  organizationId String
+  prompt         String
+  platform       String
+  locale         String
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  mentions       AiMention[]
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, active])
+}
+
+model AiMention {
+  id             String         @id @default(cuid())
+  promptId       String
+  checkedAt      DateTime       @default(now())
+  mentioned      Boolean
+  sentiment      String?
+  responseDigest String?
+  provider       String
+  confidence     DataConfidence
+  prompt         AiPrompt       @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  citations      AiCitation[]
+
+  @@index([promptId, checkedAt(sort: Desc)])
+}
+
+model AiCitation {
+  id          String    @id @default(cuid())
+  mentionId   String
+  url         String
+  citedDomain String?
+  mention     AiMention @relation(fields: [mentionId], references: [id], onDelete: Cascade)
+
+  @@index([mentionId])
+}
+
+model SocialAccount {
+  id             String       @id @default(cuid())
+  organizationId String
+  provider       String
+  accountName    String
+  encryptedToken String?
+  tokenExpiresAt DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider, accountName])
+}
+
+model Campaign {
+  id             String       @id @default(cuid())
+  organizationId String
+  dedupeKey      String?      @unique
+  name           String
+  channel        String
+  status         String       @default("draft")
+  settings       Json?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, channel, status])
+}
+
+model Lead {
+  id             String       @id @default(cuid())
+  organizationId String
+  website        String
+  businessName   String?
+  location       String?
+  score          Float?
+  stage          LeadStage    @default(NEW)
+  email          String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts       Contact[]
+  reportingClient ClientReportClient?
+  seoOpsProjects SeoOpsProject[]
+
+  @@unique([organizationId, website])
+  @@index([organizationId, stage, score(sort: Desc)])
+}
+
+model Contact {
+  id     String  @id @default(cuid())
+  leadId String
+  name   String?
+  email  String?
+  role   String?
+  source String?
+  lead   Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String?
+  title          String
+  kind           String
+  configuration  Json
+  outputUrl      String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+}
+
+model ClientReportClient {
+  id             String @id @default(cuid())
+  organizationId String
+  leadId         String? @unique
+  name           String
+  email          String?
+  website        String?
+  timezone       String @default("UTC")
+  notes          String? @db.Text
+  isActive       Boolean @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead           Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  websites       ClientReportWebsite[]
+  templates      ClientReportTemplate[]
+  reports        ClientReport[]
+  schedules      ClientReportSchedule[]
+
+  @@index([organizationId, isActive, name])
+}
+
+model ClientReportWebsite {
+  clientId       String
+  projectId      String
+  domainId       String
+  createdAt      DateTime @default(now())
+  client         ClientReportClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  domain         Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@id([clientId, domainId])
+  @@index([projectId])
+}
+
+model ClientReportBranding {
+  id             String @id @default(cuid())
+  organizationId String @unique
+  agencyName     String
+  logoUrl        String?
+  primaryColor   String @default("#157d70")
+  secondaryColor String @default("#173b3c")
+  contactName    String?
+  contactEmail   String?
+  contactPhone   String?
+  websiteUrl     String?
+  address        String? @db.Text
+  disclaimer     String? @db.Text
+  copyrightText  String?
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model ClientReportTemplate {
+  id             String @id @default(cuid())
+  organizationId String
+  clientId       String?
+  name           String
+  description    String? @db.Text
+  isDefault      Boolean @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client         ClientReportClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sections       ClientReportSection[]
+  reports        ClientReport[]
+  schedules      ClientReportSchedule[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, clientId, updatedAt])
+}
+
+model ClientReportSection {
+  id          String @id @default(cuid())
+  templateId  String
+  sectionKey  String
+  title       String
+  position    Int
+  enabled     Boolean @default(true)
+  customText  String? @db.Text
+  configuration Json?
+  template    ClientReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, sectionKey])
+  @@index([templateId, position])
+}
+
+model ClientReportSchedule {
+  id                  String @id @default(cuid())
+  organizationId      String
+  clientId            String
+  templateId          String
+  name                String
+  frequency           String
+  scheduleDay         Int @default(1)
+  scheduleMonth       Int @default(1)
+  scheduleHour        Int @default(9)
+  scheduleMinute      Int @default(0)
+  timezone            String @default("UTC")
+  approvalRequired    Boolean @default(true)
+  autoDeliveryEnabled Boolean @default(false)
+  isActive            Boolean @default(false)
+  nextRunAt           DateTime?
+  lastRunAt           DateTime?
+  failureCount        Int @default(0)
+  lastError            String? @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client              ClientReportClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  template            ClientReportTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  websites            ClientReportScheduleWebsite[]
+  recipients          ClientReportRecipient[]
+  reports             ClientReport[]
+
+  @@index([organizationId, isActive, nextRunAt])
+}
+
+model ClientReportScheduleWebsite {
+  scheduleId String
+  domainId   String
+  projectId  String
+  schedule   ClientReportSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  domain     Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([scheduleId, domainId])
+  @@index([projectId])
+}
+
+model ClientReportRecipient {
+  id          String @id @default(cuid())
+  scheduleId  String
+  email       String
+  recipientType String @default("TO")
+  schedule    ClientReportSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, email, recipientType])
+  @@index([scheduleId])
+}
+
+model ClientReport {
+  id                       String @id @default(cuid())
+  organizationId           String
+  clientId                 String
+  templateId               String
+  scheduleId               String?
+  title                    String
+  reportingPeriodStart     DateTime @db.Date
+  reportingPeriodEnd       DateTime @db.Date
+  comparisonPeriodStart    DateTime? @db.Date
+  comparisonPeriodEnd      DateTime? @db.Date
+  timezone                 String @default("UTC")
+  status                   String @default("GENERATED")
+  dataSnapshot             Json
+  commentary               Json
+  manualNotes              String? @db.Text
+  accessTokenHash          String? @unique
+  accessExpiresAt          DateTime?
+  accessRevokedAt          DateTime?
+  generatedAt              DateTime @default(now())
+  approvedAt               DateTime?
+  deliveredAt              DateTime?
+  createdById              String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client                   ClientReportClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  template                 ClientReportTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  schedule                 ClientReportSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  websites                 ClientReportIncludedWebsite[]
+  snapshot                 ClientReportDataSnapshot?
+  approvals                ClientReportApproval[]
+  deliveries               ClientReportDelivery[]
+  generationLogs           ClientReportGenerationLog[]
+  accessLogs               ClientReportAccessLog[]
+
+  @@unique([scheduleId, reportingPeriodStart, reportingPeriodEnd], map: "ClientReport_schedule_period_key")
+  @@index([organizationId, status, generatedAt(sort: Desc)])
+  @@index([clientId, reportingPeriodEnd(sort: Desc)])
+}
+
+model ClientReportIncludedWebsite {
+  reportId String
+  domainId String
+  projectId String
+  report   ClientReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  domain   Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([reportId, domainId])
+  @@index([projectId])
+}
+
+model ClientReportDataSnapshot {
+  id        String @id @default(cuid())
+  reportId  String @unique
+  sourceMap Json
+  freshness Json
+  snapshotAt DateTime @default(now())
+  report    ClientReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model ClientReportApproval {
+  id         String @id @default(cuid())
+  reportId   String
+  status     String
+  reviewedById String
+  comments   String? @db.Text
+  reviewedAt DateTime @default(now())
+  report     ClientReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, reviewedAt(sort: Desc)])
+}
+
+model ClientReportDelivery {
+  id                 String @id @default(cuid())
+  organizationId     String
+  reportId           String
+  recipient          String
+  deliveryChannel    String @default("EMAIL")
+  status             String
+  providerReference  String?
+  idempotencyKey     String @unique
+  sentAt             DateTime?
+  errorMessage       String? @db.Text
+  createdAt          DateTime @default(now())
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  report             ClientReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([reportId, createdAt(sort: Desc)])
+}
+
+model ClientReportGenerationLog {
+  id        String @id @default(cuid())
+  reportId  String
+  status    String
+  message   String? @db.Text
+  details   Json?
+  createdAt DateTime @default(now())
+  report    ClientReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, createdAt(sort: Desc)])
+}
+
+model ClientReportAccessLog {
+  id             String @id @default(cuid())
+  organizationId String
+  reportId       String
+  accessedAt     DateTime @default(now())
+  userAgent      String? @db.VarChar(512)
+  ipHash         String? @db.VarChar(64)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  report         ClientReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, accessedAt(sort: Desc)])
+  @@index([reportId, accessedAt(sort: Desc)])
+}
+
+model Workflow {
+  id             String         @id @default(cuid())
+  organizationId String
+  name           String
+  status         WorkflowStatus @default(DRAFT)
+  trigger        Json
+  steps          Json
+  lastRunAt      DateTime?
+  createdAt      DateTime       @default(now())
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runs           WorkflowRun[]
+
+  @@index([organizationId, status])
+}
+
+model WorkflowRun {
+  id         String    @id @default(cuid())
+  workflowId String
+  status     String
+  input      Json?
+  result     Json?
+  error      String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  workflow   Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId, startedAt(sort: Desc)])
+}
+
+model AgentTask {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String?
+  createdById    String
+  agentId        String
+  title          String
+  description    String       @db.Text
+  scope          Json
+  status         String       @default("QUEUED")
+  progress       Int          @default(0)
+  result          Json?
+  error           String?      @db.Text
+  logs            Json?
+  createdAt       DateTime     @default(now())
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project         Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdBy       User         @relation("AgentTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  approvals       AgentApproval[]
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([projectId, agentId, createdAt(sort: Desc)])
+}
+
+model AgentApproval {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String?
+  taskId         String?
+  agentId        String
+  action         String
+  reason         String       @db.Text
+  evidence       Json?
+  riskLevel      String       @default("low")
+  resources      Json?
+  beforePreview  Json?
+  afterPreview   Json?
+  rollbackPlan   String       @db.Text
+  status         String       @default("PENDING")
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  task           AgentTask?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  reviewedBy     User?        @relation("AgentApprovalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([taskId])
+}
+
+model AgentSetting {
+  id                String       @id @default(cuid())
+  organizationId    String
+  agentId           String
+  enabled           Boolean      @default(true)
+  model             String?
+  automationMode    String       @default("MANUAL")
+  scheduleEnabled   Boolean      @default(false)
+  executionPermission String     @default("APPROVAL_REQUIRED")
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, agentId])
+  @@index([organizationId, enabled])
+}
+
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String?
+  kind           String
+  title          String
+  body           String
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, readAt, createdAt(sort: Desc)])
+}
+
+model Integration {
+  id                   String       @id @default(cuid())
+  organizationId       String
+  provider             String
+  status               String       @default("disconnected")
+  encryptedCredentials Json?
+  lastCheckedAt        DateTime?
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+}
+
+model ApiUsage {
+  id             String       @id @default(cuid())
+  organizationId String
+  provider       String
+  operation      String
+  units          Int          @default(1)
+  costUsd        Float?
+  status         String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, provider, createdAt(sort: Desc)])
+}
+
+model ActivityLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         String
+  entityType     String
+  entityId       String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+}
+
+model SeoOpsProject {
+  id String @id @default(cuid())
+  organizationId String
+  name String
+  description String? @db.Text
+  projectId String?
+  websiteId String?
+  clientId String?
+  managerId String?
+  startDate DateTime? @db.Date
+  targetDate DateTime? @db.Date
+  status String @default("ACTIVE")
+  priority String @default("P2")
+  goals Json?
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  website Domain? @relation(fields: [websiteId], references: [id], onDelete: SetNull)
+  client Lead? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  tasks SeoTask[]
+  @@index([organizationId, status, updatedAt(sort: Desc)])
+  @@index([projectId, status])
+  @@index([websiteId])
+  @@index([clientId])
+}
+
+model SeoTask {
+  id String @id @default(cuid())
+  organizationId String
+  seoProjectId String?
+  projectId String?
+  websiteId String?
+  clientId String?
+  parentTaskId String?
+  title String
+  description String? @db.Text
+  category String @default("CUSTOM")
+  priority String @default("P2")
+  severity String @default("MEDIUM")
+  status String @default("BACKLOG")
+  sourceModule String?
+  sourceEntityType String?
+  sourceEntityId String?
+  sourceEvidence Json?
+  affectedUrls Json?
+  targetKeywords Json?
+  labels Json?
+  acceptanceCriteria Json?
+  estimatedMinutes Int?
+  startDate DateTime? @db.Date
+  dueDate DateTime? @db.Date
+  completedAt DateTime?
+  verifiedAt DateTime?
+  assigneeId String?
+  reviewerId String?
+  createdById String
+  dedupeKey String? @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  seoProject SeoOpsProject? @relation(fields: [seoProjectId], references: [id], onDelete: SetNull)
+  parent SeoTask? @relation("SeoTaskSubtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks SeoTask[] @relation("SeoTaskSubtasks")
+  collaborators SeoTaskCollaborator[]
+  comments SeoTaskComment[]
+  dependencies SeoTaskDependency[] @relation("SeoTaskDependsOn")
+  blockingTasks SeoTaskDependency[] @relation("SeoTaskBlockedBy")
+  approvals SeoTaskApproval[]
+  verifications SeoTaskVerification[]
+  activities SeoTaskActivity[]
+  @@index([organizationId, status, dueDate])
+  @@index([organizationId, assigneeId, status, dueDate])
+  @@index([seoProjectId, status, priority])
+  @@index([sourceModule, sourceEntityId])
+  @@index([parentTaskId])
+}
+
+model SeoTaskCollaborator {
+  id String @id @default(cuid())
+  taskId String
+  userId String
+  role String @default("WATCHER")
+  createdAt DateTime @default(now())
+  task SeoTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@unique([taskId, userId])
+  @@index([userId, role])
+}
+
+model SeoTaskComment {
+  id String @id @default(cuid())
+  taskId String
+  authorId String
+  body String @db.Text
+  visibility String @default("TEAM")
+  createdAt DateTime @default(now())
+  task SeoTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@index([taskId, createdAt])
+}
+
+model SeoTaskDependency {
+  id String @id @default(cuid())
+  taskId String
+  dependsOnTaskId String
+  dependencyType String @default("BLOCKS")
+  createdAt DateTime @default(now())
+  task SeoTask @relation("SeoTaskDependsOn", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn SeoTask @relation("SeoTaskBlockedBy", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+  @@unique([taskId, dependsOnTaskId])
+  @@index([dependsOnTaskId])
+}
+
+model SeoTaskApproval {
+  id String @id @default(cuid())
+  taskId String
+  reviewerId String
+  status String
+  comments String? @db.Text
+  reviewedAt DateTime @default(now())
+  task SeoTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@index([taskId, reviewedAt(sort: Desc)])
+}
+
+model SeoTaskVerification {
+  id String @id @default(cuid())
+  taskId String
+  verificationMethod String
+  verificationStatus String
+  evidence Json?
+  failureReason String? @db.Text
+  verifiedById String
+  verifiedAt DateTime @default(now())
+  task SeoTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@index([taskId, verifiedAt(sort: Desc)])
+}
+
+model SeoTaskActivity {
+  id String @id @default(cuid())
+  taskId String
+  actorId String?
+  action String
+  metadata Json?
+  createdAt DateTime @default(now())
+  task SeoTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@index([taskId, createdAt(sort: Desc)])
+}
+
+model SeoTaskAutomationRule {
+  id String @id @default(cuid())
+  organizationId String
+  name String
+  sourceModule String
+  minimumSeverity String @default("WARNING")
+  minimumAffectedUrls Int @default(1)
+  actionPriority String @default("P1")
+  assignToId String?
+  dueInDays Int @default(7)
+  enabled Boolean @default(true)
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  logs SeoTaskAutomationLog[]
+  @@index([organizationId, enabled, sourceModule])
+}
+
+model SeoTaskAutomationLog {
+  id String @id @default(cuid())
+  organizationId String
+  ruleId String
+  taskId String?
+  status String
+  message String @db.Text
+  dedupeKey String @unique
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rule SeoTaskAutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([ruleId, createdAt(sort: Desc)])
+}
+
+// Shared, tenant-scoped evidence and review records for cross-module SEO workflows.
+// Source data remains in Keyword/Ranking/Crawl/ContentPiece/Competitor/SeoTask.
+model SeoIntelligenceRecord {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String?
+  websiteId      String?
+  type           String
+  title          String       @db.VarChar(240)
+  status         String       @default("OPEN")
+  priority       String       @default("MEDIUM")
+  sourceModule   String?
+  sourceId       String?
+  data           Json
+  evidence       Json?
+  dedupeKey      String?      @unique
+  createdById    String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  website        Domain?      @relation(fields: [websiteId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, type, status, updatedAt(sort: Desc)])
+  @@index([projectId, type, createdAt(sort: Desc)])
+  @@index([websiteId, type, createdAt(sort: Desc)])
+  @@index([sourceModule, sourceId])
+}
+
+model KeywordPageMapping {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String
+  websiteId      String
+  keywordId      String?
+  phrase         String       @db.VarChar(200)
+  pageUrl        String       @db.VarChar(2048)
+  pageKey        String       @db.Char(64)
+  role           String       @default("PRIMARY")
+  searchIntent   String?
+  confidence     Float?
+  status         String       @default("PENDING_REVIEW")
+  decisionNote   String?      @db.Text
+  approvedById   String?
+  approvedAt     DateTime?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  website        Domain       @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  keyword        Keyword?     @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+  history        KeywordPageMappingHistory[]
+
+  @@unique([organizationId, projectId, phrase, pageKey])
+  @@index([organizationId, projectId, status, updatedAt(sort: Desc)])
+  @@index([websiteId, phrase, status])
+  @@index([keywordId, updatedAt(sort: Desc)])
+}
+
+model KeywordPageMappingHistory {
+  id         String           @id @default(cuid())
+  mappingId  String
+  actorId    String?
+  action     String
+  before     Json?
+  after      Json
+  note       String?          @db.Text
+  createdAt  DateTime         @default(now())
+  mapping    KeywordPageMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+
+  @@index([mappingId, createdAt(sort: Desc)])
+}
+
+model ContentVersion {
+  id             String       @id @default(cuid())
+  organizationId String
+  contentPieceId String
+  version        Int
+  title          String
+  url            String?
+  body           String?      @db.LongText
+  targetKeyword  String?
+  status         String
+  changeNote     String?      @db.Text
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentPiece   ContentPiece @relation(fields: [contentPieceId], references: [id], onDelete: Cascade)
+  reviews        ContentReview[]
+
+  @@unique([contentPieceId, version])
+  @@index([organizationId, contentPieceId, createdAt(sort: Desc)])
+}
+
+model ContentReview {
+  id             String       @id @default(cuid())
+  organizationId String
+  contentPieceId String
+  versionId      String
+  reviewerId     String?
+  status         String       @default("PENDING")
+  comments       String?      @db.Text
+  createdAt      DateTime     @default(now())
+  reviewedAt     DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentPiece   ContentPiece @relation(fields: [contentPieceId], references: [id], onDelete: Cascade)
+  version        ContentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([contentPieceId, versionId, createdAt(sort: Desc)])
+}
+
+model CompetitorMonitor {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String
+  websiteId      String
+  competitorId   String
+  enabled        Boolean      @default(true)
+  frequencyHours Int          @default(24)
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  website        Domain       @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  competitor     Competitor   @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  snapshots      CompetitorPageSnapshot[]
+  changes        CompetitorChangeEvent[]
+
+  @@index([organizationId, enabled, nextRunAt])
+  @@index([projectId, enabled])
+}
+
+model CompetitorPageSnapshot {
+  id           String           @id @default(cuid())
+  competitorId String
+  monitorId    String
+  url          String           @db.VarChar(2048)
+  observedAt   DateTime         @default(now())
+  statusCode   Int?
+  title        String?          @db.VarChar(1000)
+  description  String?          @db.Text
+  h1           String?          @db.VarChar(1000)
+  canonical    String?          @db.VarChar(2048)
+  robots       String?          @db.VarChar(500)
+  contentDigest String?
+  headings     Json?
+  structuredData Json?
+  provider     String           @default("first_party_crawler")
+  confidence   DataConfidence   @default(FIRST_PARTY)
+  competitor   Competitor      @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  monitor      CompetitorMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  changesBefore CompetitorChangeEvent[] @relation("ChangeBefore")
+  changesAfter CompetitorChangeEvent[] @relation("ChangeAfter")
+
+  @@index([competitorId, observedAt(sort: Desc)])
+  @@index([monitorId, observedAt(sort: Desc)])
+}
+
+model CompetitorChangeEvent {
+  id             String                 @id @default(cuid())
+  competitorId   String
+  monitorId      String
+  beforeSnapshotId String?
+  afterSnapshotId String
+  changeType     String
+  risk           String                 @default("LOW")
+  status         String                 @default("OPEN")
+  evidence       Json
+  dedupeKey      String                 @unique
+  createdAt      DateTime               @default(now())
+  competitor     Competitor            @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  monitor        CompetitorMonitor     @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  beforeSnapshot CompetitorPageSnapshot? @relation("ChangeBefore", fields: [beforeSnapshotId], references: [id], onDelete: SetNull)
+  afterSnapshot  CompetitorPageSnapshot @relation("ChangeAfter", fields: [afterSnapshotId], references: [id], onDelete: Cascade)
+
+  @@index([competitorId, status, createdAt(sort: Desc)])
+  @@index([monitorId, createdAt(sort: Desc)])
+}
+
+model SeoSchedule {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String?
+  websiteId      String?
+  type           String
+  title          String
+  timezone       String       @default("UTC")
+  recurrence     Json
+  payload        Json?
+  enabled        Boolean      @default(true)
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  website        Domain?      @relation(fields: [websiteId], references: [id], onDelete: SetNull)
+  executions     SeoScheduleExecution[]
+
+  @@index([organizationId, enabled, nextRunAt])
+  @@index([projectId, enabled, nextRunAt])
+}
+
+model SeoScheduleExecution {
+  id             String       @id @default(cuid())
+  organizationId String
+  scheduleId     String
+  occurrenceKey  String       @unique
+  scheduledAt    DateTime
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  status         String       @default("QUEUED")
+  attempt        Int          @default(0)
+  result         Json?
+  error          String?      @db.Text
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  schedule       SeoSchedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, scheduledAt(sort: Desc)])
+  @@index([scheduleId, scheduledAt(sort: Desc)])
+}
+
+model BackgroundJob {
+  id             String       @id @default(cuid())
+  organizationId String
+  type           String
+  payload        Json
+  dedupeKey      String       @unique
+  status         String       @default("PENDING")
+  attempts       Int          @default(0)
+  maxAttempts    Int          @default(5)
+  runAt          DateTime     @default(now())
+  lockedAt       DateTime?
+  leaseExpiresAt DateTime?
+  lockedBy       String?
+  error          String?      @db.Text
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  finishedAt     DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAt, leaseExpiresAt])
+  @@index([organizationId, createdAt(sort: Desc)])
+}

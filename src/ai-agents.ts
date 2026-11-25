@@ -1,0 +1,27 @@
+export type AiAgentDefinition = {
+  id: string;
+  route: string;
+  name: string;
+  description: string;
+  category: string;
+  capabilities: string[];
+  integrations: string[];
+  permissions: string[];
+  scheduleSupported: boolean;
+  defaultMode: "MANUAL" | "APPROVAL_REQUIRED";
+};
+
+export const aiAgentRegistry: AiAgentDefinition[] = [
+  { id: "seo-root-cause-investigator", route: "ai-seo-root-cause-investigator", name: "SEO Root Cause Investigator", description: "Connect recorded crawl findings and ranking observations into a source-linked investigation.", category: "SEO Investigation", capabilities: ["Audit issue grouping", "Affected URL inventory", "Ranking context", "Evidence-backed actions"], integrations: ["Site Audit", "Position Tracking", "Projects"], permissions: ["Workspace member", "Project access"], scheduleSupported: false, defaultMode: "MANUAL" },
+  { id: "seo-change-execution-agent", route: "ai-seo-change-execution-agent", name: "SEO Change Execution Agent", description: "Turn reviewed SEO recommendations into explicit, approval-gated project work.", category: "SEO Execution", capabilities: ["Action planning", "Approval requests", "Project task creation"], integrations: ["Site Audit", "Projects and Tasks"], permissions: ["Workspace member to propose", "Owner, admin, or manager to approve"], scheduleSupported: false, defaultMode: "APPROVAL_REQUIRED" },
+  { id: "seo-deployment-guardian", route: "ai-seo-deployment-guardian", name: "SEO Deployment Guardian", description: "Review stored SEO evidence and create a deployment readiness checklist.", category: "SEO Operations", capabilities: ["Readiness checklist", "Evidence coverage review", "Risk flags"], integrations: ["Site Audit", "Position Tracking"], permissions: ["Workspace member", "Project access"], scheduleSupported: false, defaultMode: "MANUAL" },
+  { id: "seo-knowledge-memory-agent", route: "ai-seo-knowledge-memory-agent", name: "SEO Knowledge Memory Agent", description: "Summarize prior workspace investigations and preserve source-linked project context.", category: "SEO Intelligence", capabilities: ["Investigation history", "Evidence recall", "Workspace summaries"], integrations: ["Agent Tasks", "Site Audit", "Projects"], permissions: ["Workspace member", "Project access"], scheduleSupported: false, defaultMode: "MANUAL" },
+  { id: "seo-what-if-simulation-agent", route: "ai-seo-what-if-simulation-agent", name: "SEO What-If Simulation Agent", description: "Compare user-provided scenarios using explicit assumptions without changing project data.", category: "SEO Planning", capabilities: ["Scenario comparison", "Assumption tracking", "Impact ranges"], integrations: ["Projects", "Traffic and Market"], permissions: ["Workspace member", "Project access"], scheduleSupported: false, defaultMode: "MANUAL" },
+  { id: "seo-experimentation-learning-agent", route: "ai-seo-experimentation-learning-agent", name: "SEO Experimentation & Learning Agent", description: "Structure measurable SEO experiments from observed project baselines.", category: "SEO Planning", capabilities: ["Hypothesis planning", "Baseline capture", "Measurement checklist"], integrations: ["Position Tracking", "Site Audit"], permissions: ["Workspace member", "Project access"], scheduleSupported: false, defaultMode: "MANUAL" },
+  { id: "seo-business-revenue-intelligence-agent", route: "ai-seo-business-revenue-intelligence-agent", name: "SEO Business Revenue Intelligence Agent", description: "Review connected first-party signals and identify where revenue evidence is missing.", category: "Business Intelligence", capabilities: ["Analytics coverage", "Revenue signal review", "Attribution gaps"], integrations: ["Google Analytics", "Search Console"], permissions: ["Workspace member", "Project access"], scheduleSupported: false, defaultMode: "MANUAL" },
+  { id: "seo-migration-redesign-guardian", route: "ai-seo-migration-redesign-guardian", name: "SEO Migration & Redesign Guardian", description: "Compare available before and after crawl evidence and list migration risks.", category: "SEO Operations", capabilities: ["Crawl comparison", "Redirect coverage planning", "Migration risk checklist"], integrations: ["Site Audit", "Projects"], permissions: ["Workspace member", "Project access"], scheduleSupported: false, defaultMode: "MANUAL" },
+  { id: "seo-governance-risk-agent", route: "ai-seo-governance-risk-agent", name: "SEO Governance & Risk Agent", description: "Review workspace data provenance, approval state, and operational risks.", category: "Governance", capabilities: ["Evidence provenance", "Approval review", "Risk inventory"], integrations: ["Agent Approvals", "Audit Logs", "Integrations"], permissions: ["Workspace member", "Owner or admin for approvals"], scheduleSupported: false, defaultMode: "MANUAL" },
+  { id: "autonomous-seo-project-manager", route: "ai-autonomous-seo-project-manager", name: "Autonomous SEO Project Manager", description: "Organize existing findings and work into a project-scoped action plan.", category: "Project Management", capabilities: ["Task inventory", "Priority planning", "Action tracking"], integrations: ["Projects and Tasks", "Site Audit"], permissions: ["Workspace member", "Project access"], scheduleSupported: false, defaultMode: "APPROVAL_REQUIRED" },
+];
+
+export function findAiAgent(agentId: string) { return aiAgentRegistry.find((agent) => agent.id === agentId); }
